@@ -10,3 +10,10 @@ body {
 h1 {
     color: #00ff00;
 }
+
+#gameCanvas {
+    width: 800px;
+    height: 600;
+    background: #111; 
+    border: 3px solid #0f0;
+}
