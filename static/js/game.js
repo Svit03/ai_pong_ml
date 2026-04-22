@@ -3,12 +3,12 @@ const ctx = canvas.getContext('2d');
 
 const paddleWidth = 10;
 const paddleHeight = 100;
-const paddlespeed = 8;
+const paddleSpeed = 8;
 
 let ballX = canvas.width / 2;
 let ballY = canvas.height / 2;
 let ballSpeedX = 5;
-let ballSpeedY = 3;
+let ballSpeedY = 4;
 let ballRadius = 10;
 
 let leftPaddleY = (canvas.height - paddleHeight) / 2;
@@ -48,9 +48,9 @@ async function updateAI() {
     const action = await getAiAction();
 
     if (action === 'up') {
-        rightPaddleY -= paddlespeed;
+        rightPaddleY -= paddleSpeed;
     } else if (action === 'down') {
-        rightPaddleY += paddlespeed;
+        rightPaddleY += paddleSpeed;
     }
 
     if (rightPaddleY < 0) rightPaddleY = 0;
@@ -72,7 +72,7 @@ function draw() {
     ctx.fill();
     
     ctx.fillStyle = '#0f0';
-    ctx.fillStyle(20, leftPaddleY, paddleWidth, paddleHeight);
+    ctx.fillRect(20, leftPaddleY, paddleWidth, paddleHeight);
 
     ctx.fillStyle = '#0f0';
     ctx.fillRect(canvas.width - 30, rightPaddleY, paddleWidth, paddleHeight);
