@@ -3,14 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pong ML</title>
+    <title>AI Pong ML - Самообучающийся ИИ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>AI Pong ML</h1>
-
+    <h1>🤖 AI Pong ML — Самообучающийся ИИ</h1>
+    <p>Управляй левой ракеткой мышкой | ИИ учится на своих ошибках</p>
+    
+    <div style="margin-bottom: 10px;">
+        <button onclick="saveModel()">💾 Сохранить модель</button>
+        <button onclick="loadModel()">📂 Загрузить модель</button>
+        <button onclick="resetModel()">🔄 Сбросить обучение</button>
+    </div>
+    
     <canvas id="gameCanvas" width="800" height="600"></canvas>
-
+    
+    <div style="margin-top: 10px;">
+        <p>📊 Статистика: <span id="stats">Загрузка...</span></p>
+    </div>
+    
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+    
+    <script>
+        setInterval(async () => {
+            const response = await fetch('/stats');
+            const data = await response.json();
+            document.getElementById('stats').innerHTML = 
+                `Состояний в памяти: ${data.q_table_size} | ε=${data.epsilon.toFixed(3)}`;
+        }, 5000);
+    </script>
 </body>
 </html>

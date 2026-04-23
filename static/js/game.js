@@ -28,31 +28,25 @@ canvas.addEventListener('mousemove', (e) => {
 async function getAiAction() {
     const response = await fetch('/predict', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            ball_x: ballX,
             ball_y: ballY,
-            ball_speed_x: ballSpeedX,
-            ball_speed_y: ballSpeedY,
-            right_paddle_y: rightPaddleY
+            ball_speed_y: ballSpeedY
         })
     });
-
     const data = await response.json();
     return data.action;
 }
 
 async function updateAI() {
     const action = await getAiAction();
-
+    
     if (action === 'up') {
         rightPaddleY -= paddleSpeed;
     } else if (action === 'down') {
         rightPaddleY += paddleSpeed;
     }
-
+    
     if (rightPaddleY < 0) rightPaddleY = 0;
     if (rightPaddleY > canvas.height - paddleHeight) rightPaddleY = canvas.height - paddleHeight;
 }
@@ -78,59 +72,76 @@ function draw() {
     ctx.fillRect(canvas.width - 30, rightPaddleY, paddleWidth, paddleHeight);
 }
 
-function updateGame(){
+let previousBallY = ballY;
+let previousBallSpeedY = ballSpeedY;
+let pendingReward = null;
+
+function updateGame() {
+    previousBallY = ballY;
+    previousBallSpeedY = ballSpeedY;
+    
     ballX += ballSpeedX;
     ballY += ballSpeedY;
-
+    
     if (ballY + ballRadius > canvas.height || ballY - ballRadius < 0) {
         ballSpeedY = -ballSpeedY;
     }
-
-    if (ballX - ballRadius < 30 &&
-        ballY > leftPaddleY &&
+    
+    if (ballX - ballRadius < 30 && 
+        ballY > leftPaddleY && 
         ballY < leftPaddleY + paddleHeight) {
         ballSpeedX = -ballSpeedX;
     }
-
-    if (ballX + ballRadius > canvas.width - 30 &&
-        ballY > rightPaddleY &&
+    
+    if (ballX + ballRadius > canvas.width - 30 && 
+        ballY > rightPaddleY && 
         ballY < rightPaddleY + paddleHeight) {
         ballSpeedX = -ballSpeedX;
+        sendReward(5, ballY, ballSpeedY);
     }
-
+    
     if (ballX + ballRadius < 0) {
         rightScore++;
         resetBall('right');
-        sendReward(-10);
+        sendReward(-10, ballY, ballSpeedY);
     }
-
+    
     if (ballX - ballRadius > canvas.width) {
         leftScore++;
         resetBall('left');
-        sendReward(10);
+        sendReward(10, ballY, ballSpeedY);
     }
+}
+
+async function sendReward(reward, nextBallY, nextBallSpeedY) {
+    await fetch('/reward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            reward: reward,
+            next_ball_y: nextBallY,
+            next_ball_speed_y: nextBallSpeedY
+        })
+    });
 }
 
 function resetBall(side) {
     ballX = canvas.width / 2;
     ballY = canvas.height / 2;
-
+    
     if (side === 'left') {
         ballSpeedX = -5;
     } else {
         ballSpeedX = 5;
     }
-
+    
     ballSpeedY = (Math.random() > 0.5 ? 4 : -4);
 }
 
-async function sendReward(reward) {
-    await fetch('/reward', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reward: reward })
-    });
-}
+setInterval(async () => {
+    await fetch('/save_model', { method: 'POST' });
+    console.log('💾 Модель автосохранена');
+}, 30000);
 
 async function gameLoop() {
     await updateAI();
@@ -140,3 +151,7 @@ async function gameLoop() {
 }
 
 gameLoop();
+
+window.saveModel = () => fetch('/save_model', { method: 'POST' });
+window.loadModel = () => fetch('/load_model', { method: 'POST' });
+window.resetModel = () => fetch('/reset_model', { method: 'POST' });

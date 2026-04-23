@@ -15,32 +15,30 @@ q_table = {}
 ALPHA = 0.1     
 GAMMA = 0.9     
 EPSILON = 0.7   
+EPSILON_DECAY = 0.995
+EPSILON_MIN = 0.05
 
 last_state = None
 last_action = None
-current_state = None
-current_action = None
+last_ball_y = None
+last_ball_speed_y = None
 
 def get_state(ball_y, ball_speed_y, canvas_height=600):
-    """
-    Превращает непрерывные координаты в дискретное состояние.
-    Состояние = позиция мяча (верх/центр/низ) + направление скорости (вверх/вниз)
-    """
     if ball_y < canvas_height / 3:
-        ball_zone = 'top'
+        ball_zone = 0
     elif ball_y > canvas_height * 2 / 3:
-        ball_zone = 'bottom'
+        ball_zone = 2
     else:
-        ball_zone = 'center'
+        ball_zone = 1
     
-    speed_dir = 'down' if ball_speed_y > 0 else 'up'
+    speed_dir = 1 if ball_speed_y > 0 else 0
     
     return f"{ball_zone}_{speed_dir}"
 
-def choose_action(state, epsilon=EPSILON):
-    """
-    Выбирает действие: случайное (exploration) или лучшее по Q-таблице (exploitation)
-    """
+def choose_action(state, epsilon=None):
+    if epsilon is None:
+        epsilon = EPSILON
+
     if random.random() < epsilon:
         return random.choice(ACTIONS)
     
@@ -51,10 +49,7 @@ def choose_action(state, epsilon=EPSILON):
     return IDX_TO_ACTION[best_idx]
 
 def update_q_table(state, action, reward, next_state):
-    """
-    Обновляет Q-таблицу по формуле Q-learning:
-    Q(s,a) = Q(s,a) + α * (reward + γ * max(Q(s')) - Q(s,a))
-    """
+    
     action_idx = ACTION_TO_IDX[action]
     
     if state not in q_table:
@@ -72,17 +67,18 @@ def update_q_table(state, action, reward, next_state):
     
     print(f"📚 Обучение: {state} -> {action} (награда: {reward}) | Новая ценность: {new_value:.2f}")
 
+def decay_epsilon():
+    global EPSILON
+    EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
+    print(f"📉 Epsilon уменьшен до: {EPSILON:.3f}")
+
 @app.route('/')
 def index():
-    """Главная страница"""
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """
-    Принимает данные от JS, возвращает действие для ИИ
-    """
-    global current_state, current_action
+    global last_state, last_action, last_ball_y, last_ball_speed_y
     
     data = request.json
     
@@ -93,47 +89,70 @@ def predict():
     
     action = choose_action(state)
     
-    current_state = state
-    current_action = action
+    last_state = state
+    last_action = action
+    last_ball_y = ball_y
+    last_ball_speed_y = ball_speed_y
     
-    print(f"🎮 Состояние: {state} -> Действие: {action}")
+    print(f"🎮 Состояние: {state} -> Действие: {action} (ε={EPSILON:.3f})")
     
     return jsonify({'action': action})
 
 @app.route('/reward', methods=['POST'])
 def reward():
-    """
-    Получает награду от JS и обновляет Q-таблицу
-    """
-    global current_state, current_action
+    global last_state, last_action, EPSILON
     
     data = request.json
     reward = data['reward']
+    next_ball_y = data['next_ball_y']
+    next_ball_speed_y = data['next_ball_speed_y']
     
-    if current_state and current_action:
-        next_state = current_state
+    if last_state and last_action:
+        next_state = get_state(next_ball_y, next_ball_speed_y)
+        update_q_table(last_state, last_action, reward, next_state)
+        decay_epsilon()
         
-        update_q_table(current_state, current_action, reward, next_state)
-        
-        print(f"🏆 Получена награда: {reward}")
+        print(f"🏆 Награда: {reward} | Следующее состояние: {next_state}")
     
     return jsonify({'status': 'ok'})
 
-@app.route('/save_model', methods=['POST'])
+app.route('/save_model', methods=['POST'])
 def save_model():
-    """Сохраняет Q-таблицу в файл"""
     os.makedirs('models', exist_ok=True)
-    joblib.dump(q_table, 'models/q_table.pkl')
-    return jsonify({'status': 'saved'})
+    data = {
+        'q_table': q_table,
+        'epsilon': EPSILON
+    }
+    joblib.dump(data, 'models/qlearning_model.pkl')
+    print(f"💾 Модель сохранена! Размер Q-таблицы: {len(q_table)}")
+    return jsonify({'status': 'saved', 'size': len(q_table)})
 
 @app.route('/load_model', methods=['POST'])
 def load_model():
-    """Загружает Q-таблицу из файла"""
-    global q_table
-    if os.path.exists('models/q_table.pkl'):
-        q_table = joblib.load('models/q_table.pkl')
-        return jsonify({'status': 'loaded', 'size': len(q_table)})
+    global q_table, EPSILON
+    if os.path.exists('models/qlearning_model.pkl'):
+        data = joblib.load('models/qlearning_model.pkl')
+        q_table = data['q_table']
+        EPSILON = data['epsilon']
+        print(f"📂 Модель загружена! Размер Q-таблицы: {len(q_table)}, ε={EPSILON:.3f}")
+        return jsonify({'status': 'loaded', 'size': len(q_table), 'epsilon': EPSILON})
     return jsonify({'status': 'no model found'})
+
+@app.route('/reset_model', methods=['POST'])
+def reset_model():
+    global q_table, EPSILON
+    q_table = {}
+    EPSILON = 0.7
+    print("🔄 Модель сброшена! Начинаем обучение с нуля")
+    return jsonify({'status': 'reset'})
+
+@app.route('/stats', methods=['GET'])
+def stats():
+    return jsonify({
+        'q_table_size': len(q_table),
+        'epsilon': EPSILON,
+        'q_table': q_table
+    })
 
 if __name__ == '__main__':
     os.makedirs('models', exist_ok=True)
