@@ -17,13 +17,15 @@ let rightPaddleY = (canvas.height - paddleHeight) / 2;
 let leftScore = 0;
 let rightScore = 0;
 
+let currentAction = 'stop';
+let actionCooldown = 0; 
+const ACTION_DELAY = 15; 
+
 function checkPaddleCollision(ballX, ballY, paddleX, paddleY, paddleWidth, paddleHeight, ballRadius) {
     const closestX = Math.max(paddleX, Math.min(ballX, paddleX + paddleWidth));
     const closestY = Math.max(paddleY, Math.min(ballY, paddleY + paddleHeight));
-    
     const dx = ballX - closestX;
     const dy = ballY - closestY;
-    
     return Math.sqrt(dx * dx + dy * dy) < ballRadius;
 }
 
@@ -49,11 +51,17 @@ async function getAiAction() {
 }
 
 async function updateAI() {
-    const action = await getAiAction();
+    if (actionCooldown > 0) {
+        actionCooldown--;
+    } else {
+        const newAction = await getAiAction();
+        currentAction = newAction;
+        actionCooldown = ACTION_DELAY;
+    }
     
-    if (action === 'up') {
+    if (currentAction === 'up') {
         rightPaddleY -= paddleSpeed;
-    } else if (action === 'down') {
+    } else if (currentAction === 'down') {
         rightPaddleY += paddleSpeed;
     }
     
