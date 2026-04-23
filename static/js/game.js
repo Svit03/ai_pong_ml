@@ -17,9 +17,15 @@ let rightPaddleY = (canvas.height - paddleHeight) / 2;
 let leftScore = 0;
 let rightScore = 0;
 
-let lastHitPaddle = false;
-let lastGoalScored = false;
-let lastIsMyGoal = false;
+function checkPaddleCollision(ballX, ballY, paddleX, paddleY, paddleWidth, paddleHeight, ballRadius) {
+    const closestX = Math.max(paddleX, Math.min(ballX, paddleX + paddleWidth));
+    const closestY = Math.max(paddleY, Math.min(ballY, paddleY + paddleHeight));
+    
+    const dx = ballX - closestX;
+    const dy = ballY - closestY;
+    
+    return Math.sqrt(dx * dx + dy * dy) < ballRadius;
+}
 
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -84,28 +90,43 @@ function updateGame() {
     previousBallSpeedY = ballSpeedY;
     previousRightPaddleY = rightPaddleY;
     
+    const oldBallX = ballX;
+    const oldBallY = ballY;
+    
     ballX += ballSpeedX;
     ballY += ballSpeedY;
     
-    if (ballY + ballRadius > canvas.height || ballY - ballRadius < 0) {
+    if (ballY + ballRadius > canvas.height) {
+        ballY = canvas.height - ballRadius;
+        ballSpeedY = -ballSpeedY;
+    }
+    if (ballY - ballRadius < 0) {
+        ballY = ballRadius;
         ballSpeedY = -ballSpeedY;
     }
     
-    if (ballX - ballRadius < 30 && 
-        ballY > leftPaddleY && 
-        ballY < leftPaddleY + paddleHeight) {
-        ballSpeedX = -ballSpeedX;
-        ballSpeedY += (Math.random() - 0.5) * 2;
-        ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
+    const leftPaddleX = 20;
+    if (checkPaddleCollision(ballX, ballY, leftPaddleX, leftPaddleY, paddleWidth, paddleHeight, ballRadius)) {
+        if (ballSpeedX < 0) {
+            ballX = leftPaddleX + paddleWidth + ballRadius;
+            ballSpeedX = -ballSpeedX;
+            ballSpeedY += (Math.random() - 0.5) * 3;
+            ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
+        }
     }
     
-    if (ballX + ballRadius > canvas.width - 30 && 
-        ballY > rightPaddleY && 
-        ballY < rightPaddleY + paddleHeight) {
-        ballSpeedX = -ballSpeedX;
-        hitPaddleThisFrame = true;
-        ballSpeedY += (Math.random() - 0.5) * 2;
-        ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
+    const rightPaddleX = canvas.width - 30;
+    let hitPaddle = false;
+    
+    if (checkPaddleCollision(ballX, ballY, rightPaddleX, rightPaddleY, paddleWidth, paddleHeight, ballRadius)) {
+        if (ballSpeedX > 0) {
+            ballX = rightPaddleX - ballRadius;
+            ballSpeedX = -ballSpeedX;
+            hitPaddle = true;
+            hitPaddleThisFrame = true;
+            ballSpeedY += (Math.random() - 0.5) * 3;
+            ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
+        }
     }
     
     if (ballX + ballRadius < 0) {
@@ -152,6 +173,7 @@ function resetBall(side) {
     }
     
     ballSpeedY = (Math.random() > 0.5 ? 4 : -4) + (Math.random() - 0.5) * 2;
+    ballSpeedY = Math.max(-6, Math.min(6, ballSpeedY));
 }
 
 setInterval(async () => {
