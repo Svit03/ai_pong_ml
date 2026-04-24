@@ -122,11 +122,11 @@ def predict():
     
     data = request.json
     
+    state = data['state']
     ball_y = data['ball_y']
     ball_speed_y = data['ball_speed_y']
     right_paddle_y = data['right_paddle_y']
     
-    state = get_state(ball_y, ball_speed_y, right_paddle_y)
     action = choose_action(state)
     
     last_state = state
