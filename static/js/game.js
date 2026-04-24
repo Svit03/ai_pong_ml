@@ -217,8 +217,11 @@ function resetBall(side) {
         ballSpeedX = 5;
     }
     
-    ballSpeedY = (Math.random() > 0.5 ? 4 : -4) + (Math.random() - 0.5) * 2;
-    ballSpeedY = Math.max(-6, Math.min(6, ballSpeedY));
+    const randomAngle = (Math.random() - 0.5) * 2;  // от -1 до 1
+    ballSpeedY = 3 * randomAngle;  
+    
+    if (Math.abs(ballSpeedY) < 1) ballSpeedY = ballSpeedY > 0 ? 1 : -1;
+    if (Math.abs(ballSpeedY) > 5) ballSpeedY = ballSpeedY > 0 ? 5 : -5;
 }
 
 setInterval(async () => {
