@@ -3,7 +3,7 @@ const ctx = canvas.getContext('2d');
 
 const paddleWidth = 10;
 const paddleHeight = 100;
-const paddleSpeed = 8;
+const paddleSpeed = 6;
 
 let ballX = canvas.width / 2;
 let ballY = canvas.height / 2;
@@ -13,52 +13,17 @@ let ballRadius = 10;
 
 let leftPaddleY = (canvas.height - paddleHeight) / 2;
 let rightPaddleY = (canvas.height - paddleHeight) / 2;
+let paddleVelocity = 0;
 
 let leftScore = 0;
 let rightScore = 0;
 
-function predictBallPosition(framesAhead = 15) {
-    let futureX = ballX + ballSpeedX * framesAhead;
-    let futureY = ballY + ballSpeedY * framesAhead;
-    
-    for (let i = 0; i < framesAhead; i++) {
-        if (futureY + ballRadius > canvas.height) {
-            futureY = canvas.height - ballRadius - (futureY + ballRadius - canvas.height);
-        }
-        if (futureY - ballRadius < 0) {
-            futureY = ballRadius + (0 - (futureY - ballRadius));
-        }
-    }
-    
-    return { x: futureX, y: futureY };
-}
+let predictedX = ballX;
+let predictedY = ballY;
 
-function getStateFromPrediction() {
-    const prediction = predictBallPosition(12); 
-    
-    let predictedZone;
-    if (prediction.y < canvas.height / 3) predictedZone = 0;
-    else if (prediction.y > canvas.height * 2 / 3) predictedZone = 2;
-    else predictedZone = 1;
-    
-    const speedDir = ballSpeedY > 0 ? 1 : 0;
-    
-    const paddleCenter = rightPaddleY + paddleHeight / 2;
-    let relativePos;
-    if (paddleCenter < prediction.y - 20) relativePos = 0;      
-    else if (paddleCenter > prediction.y + 20) relativePos = 2; 
-    else relativePos = 1;                                       
-    
-    return `${predictedZone}_${speedDir}_${relativePos}`;
-}
-
-function checkPaddleCollision(ballX, ballY, paddleX, paddleY, paddleWidth, paddleHeight, ballRadius) {
-    const closestX = Math.max(paddleX, Math.min(ballX, paddleX + paddleWidth));
-    const closestY = Math.max(paddleY, Math.min(ballY, paddleY + paddleHeight));
-    const dx = ballX - closestX;
-    const dy = ballY - closestY;
-    return Math.sqrt(dx * dx + dy * dy) < ballRadius;
-}
+let currentAction = 'stop';
+let actionCooldown = 0;
+const ACTION_DELAY = 25;
 
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -68,25 +33,25 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 async function getAiAction() {
-    const state = getStateFromPrediction();
-    
     const response = await fetch('/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            state: state,  
             ball_y: ballY,
             ball_speed_y: ballSpeedY,
+            ball_speed_x: ballSpeedX,
             right_paddle_y: rightPaddleY
         })
     });
     const data = await response.json();
+    
+    if (data.predicted_y) {
+        predictedY = data.predicted_y;
+        predictedX = data.predicted_x || (ballX + ballSpeedX * 15);
+    }
+    
     return data.action;
 }
-
-let currentAction = 'stop';
-let actionCooldown = 0;
-const ACTION_DELAY = 12;  
 
 async function updateAI() {
     if (actionCooldown > 0) {
@@ -96,15 +61,34 @@ async function updateAI() {
         currentAction = newAction;
         actionCooldown = ACTION_DELAY;
     }
-    
-    if (currentAction === 'up') {
-        rightPaddleY -= paddleSpeed;
-    } else if (currentAction === 'down') {
-        rightPaddleY += paddleSpeed;
+
+    let center = rightPaddleY + paddleHeight / 2;
+    let diff = predictedY - center;
+
+    const DEADZONE = 35;
+    const MAX_SPEED = 8;
+    const ACCELERATION = 0.5;
+    const FRICTION = 0.8;
+
+    let targetVelocity = 0;
+
+    if (Math.abs(diff) > DEADZONE) {
+        targetVelocity = Math.sign(diff) * Math.min(MAX_SPEED, Math.abs(diff) * 0.2);
     }
-    
-    if (rightPaddleY < 0) rightPaddleY = 0;
-    if (rightPaddleY > canvas.height - paddleHeight) rightPaddleY = canvas.height - paddleHeight;
+
+    paddleVelocity += (targetVelocity - paddleVelocity) * ACCELERATION;
+    paddleVelocity *= FRICTION;
+    rightPaddleY += paddleVelocity;
+
+    if (rightPaddleY < 0) {
+        rightPaddleY = 0;
+        paddleVelocity = 0;
+    }
+
+    if (rightPaddleY > canvas.height - paddleHeight) {
+        rightPaddleY = canvas.height - paddleHeight;
+        paddleVelocity = 0;
+    }
 }
 
 function draw() {
@@ -116,16 +100,23 @@ function draw() {
     ctx.fillText(leftScore, canvas.width / 4, 50);
     ctx.fillText(rightScore, canvas.width * 3 / 4, 50);
     
-    const prediction = predictBallPosition(12);
     ctx.fillStyle = '#ff4444';
     ctx.beginPath();
-    ctx.arc(prediction.x, prediction.y, 5, 0, Math.PI * 2);
+    ctx.arc(predictedX, predictedY, 6, 0, Math.PI * 2);
     ctx.fill();
+    
+    ctx.beginPath();
+    ctx.moveTo(ballX, ballY);
+    ctx.lineTo(predictedX, predictedY);
+    ctx.strokeStyle = '#ff4444';
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
     
     ctx.font = '12px monospace';
     ctx.fillStyle = '#888';
     ctx.fillText(`AI: ${currentAction}`, canvas.width - 80, 30);
-    ctx.fillText(`Pred Y: ${Math.round(prediction.y)}`, canvas.width - 80, 50);
+    ctx.fillText(`Pred Y: ${Math.round(predictedY)}`, canvas.width - 80, 50);
     
     ctx.fillStyle = '#fff';
     ctx.beginPath();
@@ -140,51 +131,58 @@ function draw() {
 let hitPaddleThisFrame = false;
 
 function updateGame() {
-    ballX += ballSpeedX;
-    ballY += ballSpeedY;
+    let newX = ballX + ballSpeedX;
+    let newY = ballY + ballSpeedY;
     
-    if (ballY + ballRadius > canvas.height) {
-        ballY = canvas.height - ballRadius;
+    if (newY + ballRadius > canvas.height) {
+        newY = canvas.height - ballRadius;
         ballSpeedY = -ballSpeedY;
     }
-    if (ballY - ballRadius < 0) {
-        ballY = ballRadius;
+    if (newY - ballRadius < 0) {
+        newY = ballRadius;
         ballSpeedY = -ballSpeedY;
     }
     
     const leftPaddleX = 20;
-    if (checkPaddleCollision(ballX, ballY, leftPaddleX, leftPaddleY, paddleWidth, paddleHeight, ballRadius)) {
-        if (ballSpeedX < 0) {
-            ballX = leftPaddleX + paddleWidth + ballRadius;
-            ballSpeedX = -ballSpeedX;
-            ballSpeedY += (Math.random() - 0.5) * 3;
-            ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
-        }
-    }
-    
     const rightPaddleX = canvas.width - 30;
-    let hitPaddle = false;
     
-    if (checkPaddleCollision(ballX, ballY, rightPaddleX, rightPaddleY, paddleWidth, paddleHeight, ballRadius)) {
-        if (ballSpeedX > 0) {
-            ballX = rightPaddleX - ballRadius;
-            ballSpeedX = -ballSpeedX;
-            hitPaddle = true;
-            hitPaddleThisFrame = true;
-            ballSpeedY += (Math.random() - 0.5) * 3;
-            ballSpeedY = Math.max(-8, Math.min(8, ballSpeedY));
-        }
+    if (ballSpeedX < 0 && 
+        newX - ballRadius < leftPaddleX + paddleWidth && 
+        newX + ballRadius > leftPaddleX &&
+        newY + ballRadius > leftPaddleY && 
+        newY - ballRadius < leftPaddleY + paddleHeight) {
+        
+        newX = leftPaddleX + paddleWidth + ballRadius;
+        ballSpeedX = -ballSpeedX;
+        ballSpeedY += (Math.random() - 0.5) * 2;
+        ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
     }
+    
+    if (ballSpeedX > 0 && 
+        newX + ballRadius > rightPaddleX && 
+        newX - ballRadius < rightPaddleX + paddleWidth &&
+        newY + ballRadius > rightPaddleY && 
+        newY - ballRadius < rightPaddleY + paddleHeight) {
+        
+        newX = rightPaddleX - ballRadius;
+        ballSpeedX = -ballSpeedX;
+        hitPaddleThisFrame = true;
+        ballSpeedY += (Math.random() - 0.5) * 2;
+        ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
+    }
+    
+    ballX = newX;
+    ballY = newY;
     
     if (ballX + ballRadius < 0) {
         rightScore++;
         sendReward(false, true, true);
-        resetBall('right');
+        resetBall('left');
         hitPaddleThisFrame = false;
     } else if (ballX - ballRadius > canvas.width) {
         leftScore++;
         sendReward(true, false, false);
-        resetBall('left');
+        resetBall('right');
         hitPaddleThisFrame = false;
     } else if (hitPaddleThisFrame) {
         sendReward(true, false, false);
@@ -217,16 +215,16 @@ function resetBall(side) {
         ballSpeedX = 5;
     }
     
-    const randomAngle = (Math.random() - 0.5) * 2;  // от -1 до 1
-    ballSpeedY = 3 * randomAngle;  
+    const randomAngle = (Math.random() - 0.5) * 2;
+    ballSpeedY = 3 * randomAngle;
     
-    if (Math.abs(ballSpeedY) < 1) ballSpeedY = ballSpeedY > 0 ? 1 : -1;
+    if (Math.abs(ballSpeedY) < 1.5) ballSpeedY = ballSpeedY > 0 ? 1.5 : -1.5;
     if (Math.abs(ballSpeedY) > 5) ballSpeedY = ballSpeedY > 0 ? 5 : -5;
 }
 
 setInterval(async () => {
     await fetch('/save_model', { method: 'POST' });
-    console.log('💾 Модель автосохранена');
+    console.log('Model auto-saved');
 }, 30000);
 
 async function gameLoop() {

@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, jsonify
-import json
 import random
 import joblib
 import os
@@ -12,9 +11,9 @@ IDX_TO_ACTION = {0: 'up', 1: 'down', 2: 'stop'}
 
 q_table = {}
 
-ALPHA = 0.1     
-GAMMA = 0.9     
-EPSILON = 0.7   
+ALPHA = 0.1
+GAMMA = 0.9
+EPSILON = 0.7
 EPSILON_DECAY = 0.995
 EPSILON_MIN = 0.05
 
@@ -22,91 +21,93 @@ last_state = None
 last_action = None
 last_ball_y = None
 last_ball_speed_y = None
+last_right_paddle_y = None
+
+def predict_ball_position(ball_x, ball_y, ball_speed_x, ball_speed_y,
+                          ball_radius=10, canvas_width=800, canvas_height=600,
+                          frames_ahead=15):
+    future_x = ball_x
+    future_y = ball_y
+    speed_x = ball_speed_x
+    speed_y = ball_speed_y
+
+    for _ in range(frames_ahead):
+        future_x += speed_x
+        future_y += speed_y
+
+        if future_y + ball_radius > canvas_height:
+            future_y = canvas_height - ball_radius - (future_y + ball_radius - canvas_height)
+            speed_y = -speed_y
+        if future_y - ball_radius < 0:
+            future_y = ball_radius + (0 - (future_y - ball_radius))
+            speed_y = -speed_y
+
+    return future_x, future_y
 
 def get_state(ball_y, ball_speed_y, right_paddle_y, canvas_height=600, paddle_height=100):
-    if ball_y < canvas_height / 3:
+    _, predicted_y = predict_ball_position(0, ball_y, 0, ball_speed_y, 10, 800, canvas_height, 12)
+
+    if predicted_y < canvas_height / 3:
         ball_zone = 0
-    elif ball_y > canvas_height * 2 / 3:
-        ball_zone = 2
-    else:
+    elif predicted_y < canvas_height * 2 / 3:
         ball_zone = 1
-    
-    speed_dir = 1 if ball_speed_y > 0 else 0
-    
-    paddle_center = right_paddle_y + paddle_height / 2
-    if paddle_center < ball_y - 30:
-        paddle_pos = 0 
-    elif paddle_center > ball_y + 30:
-        paddle_pos = 2  
     else:
-        paddle_pos = 1 
+        ball_zone = 2
+
+    speed_dir = 1 if ball_speed_y > 0 else 0
+
+    paddle_center = right_paddle_y + paddle_height / 2
+    if paddle_center < predicted_y - 25:
+        paddle_pos = 0
+    elif paddle_center > predicted_y + 25:
+        paddle_pos = 2
+    else:
+        paddle_pos = 1
 
     return f"{ball_zone}_{speed_dir}_{paddle_pos}"
 
-def choose_action(state, epsilon=None):
-    if epsilon is None:
-        epsilon = EPSILON
-
-    if random.random() < epsilon:
+def choose_action(state):
+    if random.random() < EPSILON:
         return random.choice(ACTIONS)
-    
+
     if state not in q_table:
-        q_table[state] = [0.0, 0.0, 0.0]  
-    
+        q_table[state] = [0.0, 0.0, 0.0]
+
     best_idx = max(range(3), key=lambda i: q_table[state][i])
     return IDX_TO_ACTION[best_idx]
 
 def calculate_reward(action, hit_paddle, goal_scored, is_my_goal, right_paddle_y, ball_y, paddle_height=100):
     reward = 0
-    
+
     if hit_paddle:
         reward += 15
-        print(f" Отскок! +15")
-    
+
     if is_my_goal:
         reward -= 20
-        print(f"  Гол пропущен! -20")
-    
+
     if goal_scored:
         reward += 10
-        print(f"  Гол забит! +10")
-    
+
     paddle_center = right_paddle_y + paddle_height / 2
-    distance_to_ball = abs(paddle_center - ball_y)
-    
-    if action == 'up' and paddle_center > ball_y:
-        reward += 2  
-        print(f"   Движение к мячу +2")
-    elif action == 'down' and paddle_center < ball_y:
-        reward += 2  
-        print(f"    Движение к мячу +2")
-    elif action == 'stop' and distance_to_ball < 20:
-        reward += 3  
-        print(f"    Точное позиционирование +3")
-    elif action == 'stop' and distance_to_ball > 50:
-        reward -= 1 
-        print(f"    Бездействие далеко от мяча -1")
-    
+    distance = abs(paddle_center - ball_y)
+
+    if action == 'stop' and distance < 30:
+        reward += 3
+
     return reward
 
 def update_q_table(state, action, reward, next_state):
-    
     action_idx = ACTION_TO_IDX[action]
-    
+
     if state not in q_table:
         q_table[state] = [0.0, 0.0, 0.0]
     if next_state not in q_table:
         q_table[next_state] = [0.0, 0.0, 0.0]
-    
+
     old_value = q_table[state][action_idx]
-    
     future_max = max(q_table[next_state])
-    
     new_value = old_value + ALPHA * (reward + GAMMA * future_max - old_value)
-    
     q_table[state][action_idx] = new_value
-    
-    print(f"📚 Обучение: {state} -> {action} (награда: {reward}) | Новая ценность: {new_value:.2f}")
 
 def decay_epsilon():
     global EPSILON
@@ -119,63 +120,66 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     global last_state, last_action, last_ball_y, last_ball_speed_y, last_right_paddle_y
-    
+
     data = request.json
-    
-    state = data['state']
+
     ball_y = data['ball_y']
     ball_speed_y = data['ball_speed_y']
     right_paddle_y = data['right_paddle_y']
-    
+
+    state = get_state(ball_y, ball_speed_y, right_paddle_y)
     action = choose_action(state)
-    
+
+    pred_x, pred_y = predict_ball_position(
+        0, ball_y, 0, ball_speed_y, 10, 800, 600, 15
+    )
+
     last_state = state
     last_action = action
     last_ball_y = ball_y
     last_ball_speed_y = ball_speed_y
     last_right_paddle_y = right_paddle_y
-    
-    print(f"🎮 Состояние: {state} -> {action} (ε={EPSILON:.3f})")
-    
-    return jsonify({'action': action})
+
+    return jsonify({
+        'action': action,
+        'predicted_x': pred_x,
+        'predicted_y': pred_y
+    })
 
 @app.route('/reward', methods=['POST'])
 def reward():
-    global last_state, last_action, EPSILON
-    
+    global last_state, last_action
+
     data = request.json
     hit_paddle = data.get('hit_paddle', False)
     goal_scored = data.get('goal_scored', False)
     is_my_goal = data.get('is_my_goal', False)
+
     next_ball_y = data['next_ball_y']
     next_ball_speed_y = data['next_ball_speed_y']
     next_right_paddle_y = data['next_right_paddle_y']
-    
+
     if last_state and last_action:
         reward_value = calculate_reward(
-            last_action, 
-            hit_paddle, 
-            goal_scored, 
+            last_action,
+            hit_paddle,
+            goal_scored,
             is_my_goal,
             last_right_paddle_y,
             last_ball_y
         )
-        
+
         next_state = get_state(next_ball_y, next_ball_speed_y, next_right_paddle_y)
         update_q_table(last_state, last_action, reward_value, next_state)
         decay_epsilon()
-        
-        print(f"🏆 ИТОГО награда: {reward_value}\n")
-    
+
     return jsonify({'status': 'ok'})
 
 @app.route('/save_model', methods=['POST'])
 def save_model():
     os.makedirs('models', exist_ok=True)
-    data = {'q_table': q_table, 'epsilon': EPSILON}
-    joblib.dump(data, 'models/qlearning_model.pkl')
-    print(f"💾 Модель сохранена! Размер: {len(q_table)}")
-    return jsonify({'status': 'saved', 'size': len(q_table)})
+    joblib.dump({'q_table': q_table, 'epsilon': EPSILON}, 'models/qlearning_model.pkl')
+    return jsonify({'status': 'saved'})
 
 @app.route('/load_model', methods=['POST'])
 def load_model():
@@ -184,16 +188,14 @@ def load_model():
         data = joblib.load('models/qlearning_model.pkl')
         q_table = data['q_table']
         EPSILON = data['epsilon']
-        print(f"📂 Модель загружена! Размер: {len(q_table)}, ε={EPSILON:.3f}")
-        return jsonify({'status': 'loaded', 'size': len(q_table)})
-    return jsonify({'status': 'no model found'})
+        return jsonify({'status': 'loaded'})
+    return jsonify({'status': 'no model'})
 
 @app.route('/reset_model', methods=['POST'])
 def reset_model():
     global q_table, EPSILON
     q_table = {}
     EPSILON = 0.7
-    print("🔄 Модель сброшена!")
     return jsonify({'status': 'reset'})
 
 @app.route('/stats', methods=['GET'])
