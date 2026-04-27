@@ -220,7 +220,9 @@ async function sendReward(hit, goalForAI, goalForPlayer) {
             is_my_goal: goalForAI,
             next_ball_y: ballY,
             next_ball_speed_y: ballSpeedY,
-            next_right_paddle_y: rightPaddleY
+            next_right_paddle_y: rightPaddleY,
+            left_score: leftScore,
+            right_score: rightScore
         })
     });
 }

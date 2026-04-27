@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Pong ML - Самообучающийся ИИ</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -66,6 +67,67 @@
                 }
             } catch(e) {}
         }, 3000);
+    </script>
+    <div style="margin-top: 20px;">
+        <canvas id="trainingChart" width="400" height="200" style="background: #333; border-radius: 10px;"></canvas>
+    </div>
+    <script>
+        let chart;
+        
+        async function updateChart() {
+            try {
+                const response = await fetch('/history');
+                const data = await response.json();
+                
+                if (data.timestamps && data.timestamps.length > 0) {
+                    const labels = data.timestamps.map((_, i) => i);
+                    
+                    if (chart) {
+                        chart.data.datasets[0].data = data.epsilon_values;
+                        chart.data.datasets[1].data = data.qtable_sizes;
+                        chart.update();
+                    } else {
+                        const ctx = document.getElementById('trainingChart').getContext('2d');
+                        chart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'Epsilon (исследование)',
+                                        data: data.epsilon_values,
+                                        borderColor: '#ff4444',
+                                        backgroundColor: 'rgba(255,68,68,0.1)',
+                                        tension: 0.1,
+                                        yAxisID: 'y'
+                                    },
+                                    {
+                                        label: 'Размер Q-таблицы',
+                                        data: data.qtable_sizes,
+                                        borderColor: '#44ff44',
+                                        backgroundColor: 'rgba(68,255,68,0.1)',
+                                        tension: 0.1,
+                                        yAxisID: 'y1'
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                interaction: { mode: 'index', intersect: false },
+                                plugins: { legend: { position: 'top' } },
+                                scales: {
+                                    y: { title: { display: true, text: 'Epsilon' }, min: 0, max: 1 },
+                                    y1: { position: 'right', title: { display: true, text: 'Размер Q-таблицы' } }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch(e) { console.error(e); }
+        }
+        
+        setInterval(updateChart, 5000);
+        setTimeout(updateChart, 1000);
     </script>
 </body>
 </html>

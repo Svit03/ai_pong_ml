@@ -2,6 +2,17 @@ from flask import Flask, render_template, request, jsonify
 import random
 import joblib
 import os
+import time
+from collections import deque
+
+training_history = {
+    'timestamps': [],
+    'epsilon_values': [],
+    'qtable_sizes': [],
+    'scores': []  
+}
+last_score_record = None
+
 
 app = Flask(__name__)
 
@@ -155,17 +166,20 @@ def predict():
 
 @app.route('/reward', methods=['POST'])
 def reward():
-    global last_state, last_action
-
+    global last_state, last_action, training_history, last_score_record
+    
     data = request.json
     hit_paddle = data.get('hit_paddle', False)
     goal_scored = data.get('goal_scored', False)
     is_my_goal = data.get('is_my_goal', False)
-
+    
     next_ball_y = data['next_ball_y']
     next_ball_speed_y = data['next_ball_speed_y']
     next_right_paddle_y = data['next_right_paddle_y']
-
+    
+    left_score = data.get('left_score', 0)
+    right_score = data.get('right_score', 0)
+    
     if last_state and last_action:
         reward_value = calculate_reward(
             last_action,
@@ -175,10 +189,16 @@ def reward():
             last_right_paddle_y,
             last_ball_y
         )
-
+        
         next_state = get_state(next_ball_y, next_ball_speed_y, next_right_paddle_y)
         update_q_table(last_state, last_action, reward_value, next_state)
         decay_epsilon()
+        
+        if len(training_history['timestamps']) < 100:
+            training_history['timestamps'].append(time.time())
+            training_history['epsilon_values'].append(EPSILON)
+            training_history['qtable_sizes'].append(len(q_table))
+            training_history['scores'].append(f"{left_score}:{right_score}")
 
     return jsonify({'status': 'ok'})
 
@@ -211,6 +231,10 @@ def stats():
         'q_table_size': len(q_table),
         'epsilon': EPSILON
     })
+
+@app.route('/history', methods=['GET'])
+def get_history():
+    return jsonify(training_history)
 
 @app.route('/qtable', methods=['GET'])
 def get_qtable():
