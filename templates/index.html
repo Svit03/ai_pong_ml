@@ -20,17 +20,52 @@
     
     <div style="margin-top: 10px;">
         <p>📊 Статистика: <span id="stats">Загрузка...</span></p>
+        <p>🏆 Последняя награда: <span id="lastReward">0</span></p>
+        <p>🎯 Действие ИИ: <span id="aiAction">stop</span></p>
+    </div>
+    
+    <div id="qtable" style="margin-top: 20px; font-family: monospace; font-size: 12px; background: #222; padding: 10px; max-height: 300px; overflow-y: auto;">
+        <strong>Q-таблица (ценность действий):</strong><br>
+        Загрузка...
     </div>
     
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
     
     <script>
+        let lastRewardDisplay = 0;
+        
         setInterval(async () => {
-            const response = await fetch('/stats');
-            const data = await response.json();
-            document.getElementById('stats').innerHTML = 
-                `Состояний в памяти: ${data.q_table_size} | ε=${data.epsilon.toFixed(3)}`;
-        }, 5000);
+            try {
+                const response = await fetch('/stats');
+                const data = await response.json();
+                document.getElementById('stats').innerHTML = 
+                    `Состояний в памяти: ${data.q_table_size} | ε=${data.epsilon.toFixed(3)}`;
+            } catch(e) {}
+        }, 2000);
+        
+        setInterval(async () => {
+            try {
+                const response = await fetch('/qtable');
+                const data = await response.json();
+                if (data.q_table && Object.keys(data.q_table).length > 0) {
+                    let html = '<strong>Q-таблица (ценность действий):</strong><br><table border="1" cellpadding="5" style="border-collapse: collapse;">';
+                    html += '<tr><th>Состояние</th><th>↑ up</th><th>↓ down</th><th>⏹ stop</th><th>Лучшее</th></tr>';
+                    for (const [state, values] of Object.entries(data.q_table)) {
+                        const bestIdx = values.indexOf(Math.max(...values));
+                        const bestAction = ['up', 'down', 'stop'][bestIdx];
+                        html += `<tr>
+                            <td>${state}</td>
+                            <td>${values[0].toFixed(2)}</td>
+                            <td>${values[1].toFixed(2)}</td>
+                            <td>${values[2].toFixed(2)}</td>
+                            <td style="background:#0f0;">${bestAction}</td>
+                        </tr>`;
+                    }
+                    html += '</table>';
+                    document.getElementById('qtable').innerHTML = html;
+                }
+            } catch(e) {}
+        }, 3000);
     </script>
 </body>
 </html>
