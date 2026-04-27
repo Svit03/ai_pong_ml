@@ -25,7 +25,13 @@ let currentAction = 'stop';
 let actionCooldown = 0;
 const ACTION_DELAY = 25;
 
+let gameRunning = true;
+let gameStarted = false;
+let countdownValue = 3;
+let countdownInterval = null;
+
 canvas.addEventListener('mousemove', (e) => {
+    if (!gameRunning || !gameStarted) return;
     const rect = canvas.getBoundingClientRect();
     leftPaddleY = e.clientY - rect.top - paddleHeight / 2;
     if (leftPaddleY < 0) leftPaddleY = 0;
@@ -33,6 +39,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 async function getAiAction() {
+    if (!gameRunning || !gameStarted) return 'stop';
     const response = await fetch('/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,6 +61,8 @@ async function getAiAction() {
 }
 
 async function updateAI() {
+    if (!gameRunning || !gameStarted) return;
+    
     if (actionCooldown > 0) {
         actionCooldown--;
     } else {
@@ -100,6 +109,29 @@ function draw() {
     ctx.fillText(leftScore, canvas.width / 4, 50);
     ctx.fillText(rightScore, canvas.width * 3 / 4, 50);
     
+    if (!gameStarted) {
+        ctx.fillStyle = '#00ff88';
+        ctx.font = 'bold 36px monospace';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00ff88';
+        ctx.fillText('CLICK START', canvas.width/2 - 100, canvas.height/2);
+        ctx.shadowBlur = 0;
+    } else if (!gameRunning && gameStarted) {
+        ctx.fillStyle = '#ffaa00';
+        ctx.font = 'bold 36px monospace';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ffaa00';
+        ctx.fillText('PAUSED', canvas.width/2 - 60, canvas.height/2);
+        ctx.shadowBlur = 0;
+    } else if (countdownValue > 0 && gameStarted && gameRunning) {
+        ctx.fillStyle = '#ffaa00';
+        ctx.font = 'bold 48px monospace';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ffaa00';
+        ctx.fillText(countdownValue, canvas.width/2 - 15, canvas.height/2);
+        ctx.shadowBlur = 0;
+    }
+    
     ctx.fillStyle = '#ff4444';
     ctx.beginPath();
     ctx.arc(predictedX, predictedY, 6, 0, Math.PI * 2);
@@ -131,6 +163,8 @@ function draw() {
 let hitPaddleThisFrame = false;
 
 function updateGame() {
+    if (!gameRunning || !gameStarted || countdownValue > 0) return;
+    
     let newX = ballX + ballSpeedX;
     let newY = ballY + ballSpeedY;
     
@@ -244,9 +278,56 @@ function resetBall(side) {
     if (Math.abs(ballSpeedY) > 5) ballSpeedY = ballSpeedY > 0 ? 5 : -5;
 }
 
+function startGame() {
+    if (gameStarted) return;
+    gameStarted = true;
+    gameRunning = true;
+    countdownValue = 3;
+    
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+        countdownValue--;
+        if (countdownValue <= 0) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+    }, 1000);
+}
+
+function pauseGame() {
+    if (!gameStarted) return;
+    gameRunning = !gameRunning;
+    if (!gameRunning && countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        countdownValue = 3;
+    }
+}
+
+function resetFullGame() {
+    gameStarted = false;
+    gameRunning = true;
+    countdownValue = 3;
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    leftScore = 0;
+    rightScore = 0;
+    ballX = canvas.width / 2;
+    ballY = canvas.height / 2;
+    ballSpeedX = 5;
+    ballSpeedY = (Math.random() > 0.5 ? 4 : -4);
+    leftPaddleY = (canvas.height - paddleHeight) / 2;
+    rightPaddleY = (canvas.height - paddleHeight) / 2;
+    paddleVelocity = 0;
+    currentAction = 'stop';
+}
+
 setInterval(async () => {
-    await fetch('/save_model', { method: 'POST' });
-    console.log('Model auto-saved');
+    if (gameStarted && gameRunning && countdownValue <= 0) {
+        await fetch('/save_model', { method: 'POST' });
+    }
 }, 30000);
 
 async function gameLoop() {
@@ -258,6 +339,8 @@ async function gameLoop() {
 
 gameLoop();
 
-window.saveModel = () => fetch('/save_model', { method: 'POST' });
+window.saveModel = () => { if (gameStarted && gameRunning) fetch('/save_model', { method: 'POST'}); };
 window.loadModel = () => fetch('/load_model', { method: 'POST' });
-window.resetModel = () => fetch('/reset_model', { method: 'POST' });
+window.resetModel = () => { resetFullGame(); fetch('/reset_model', { method: 'POST'}); };
+window.startGame = startGame;
+window.pauseGame = pauseGame;
