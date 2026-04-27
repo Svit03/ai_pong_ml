@@ -205,6 +205,13 @@ def stats():
         'epsilon': EPSILON
     })
 
+@app.route('/qtable', methods=['GET'])
+def get_qtable():
+    return jsonify({
+        'q_table': q_table,
+        'size': len(q_table)
+    })
+
 if __name__ == '__main__':
     os.makedirs('models', exist_ok=True)
     app.run(debug=True)
