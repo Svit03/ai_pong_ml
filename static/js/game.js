@@ -191,6 +191,26 @@ function updateGame() {
 }
 
 async function sendReward(hit, goalForAI, goalForPlayer) {
+    let rewardValue = 0;
+    
+    if (hit) rewardValue += 15;
+    if (goalForAI) rewardValue -= 20;
+    if (goalForPlayer) rewardValue += 10;
+    
+    const rewardSpan = document.getElementById('lastReward');
+    if (rewardSpan) {
+        rewardSpan.textContent = rewardValue;
+        rewardSpan.style.color = rewardValue >= 0 ? '#0f0' : '#f00';
+        setTimeout(() => {
+            rewardSpan.style.color = '#fff';
+        }, 500);
+    }
+    
+    const actionSpan = document.getElementById('aiAction');
+    if (actionSpan) {
+        actionSpan.textContent = currentAction;
+    }
+    
     await fetch('/reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
