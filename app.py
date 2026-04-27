@@ -22,11 +22,11 @@ IDX_TO_ACTION = {0: 'up', 1: 'down', 2: 'stop'}
 
 q_table = {}
 
-ALPHA = 0.1
-GAMMA = 0.9
-EPSILON = 0.7
-EPSILON_DECAY = 0.995
-EPSILON_MIN = 0.05
+ALPHA = 0.15
+GAMMA = 0.95
+EPSILON = 0.8
+EPSILON_DECAY = 0.992
+EPSILON_MIN = 0.02
 
 last_state = None
 last_action = None
@@ -194,11 +194,10 @@ def reward():
         update_q_table(last_state, last_action, reward_value, next_state)
         decay_epsilon()
         
-        if len(training_history['timestamps']) < 100:
-            training_history['timestamps'].append(time.time())
-            training_history['epsilon_values'].append(EPSILON)
-            training_history['qtable_sizes'].append(len(q_table))
-            training_history['scores'].append(f"{left_score}:{right_score}")
+        training_history['timestamps'].append(time.time())
+        training_history['epsilon_values'].append(EPSILON)
+        training_history['qtable_sizes'].append(len(q_table))
+        training_history['scores'].append(f"{left_score}:{right_score}")
 
     return jsonify({'status': 'ok'})
 
@@ -220,9 +219,15 @@ def load_model():
 
 @app.route('/reset_model', methods=['POST'])
 def reset_model():
-    global q_table, EPSILON
+    global q_table, EPSILON, training_history
     q_table = {}
     EPSILON = 0.7
+    training_history = {
+        'timestamps': [],
+        'epsilon_values': [],
+        'qtable_sizes': [],
+        'scores': []
+    }
     return jsonify({'status': 'reset'})
 
 @app.route('/stats', methods=['GET'])

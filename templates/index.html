@@ -8,39 +8,63 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>🤖 AI Pong ML — Самообучающийся ИИ</h1>
-    <p>Управляй левой ракеткой мышкой | ИИ учится на своих ошибках</p>
-    
-    <div style="margin-bottom: 10px;">
-        <button onclick="saveModel()">💾 Сохранить модель</button>
-        <button onclick="loadModel()">📂 Загрузить модель</button>
-        <button onclick="resetModel()">🔄 Сбросить обучение</button>
-    </div>
-    
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    
-    <div style="margin-top: 10px;">
-        <p>📊 Статистика: <span id="stats">Загрузка...</span></p>
-        <p>🏆 Последняя награда: <span id="lastReward">0</span></p>
-        <p>🎯 Действие ИИ: <span id="aiAction">stop</span></p>
-    </div>
-    
-    <div id="qtable" style="margin-top: 20px; font-family: monospace; font-size: 12px; background: #222; padding: 10px; max-height: 300px; overflow-y: auto;">
-        <strong>Q-таблица (ценность действий):</strong><br>
-        Загрузка...
+    <div class="container">
+        <h1>🤖 AI Pong ML</h1>
+        <p class="subtitle">Самообучающийся ИИ | Управляй левой ракеткой мышкой</p>
+        
+        <div class="button-group">
+            <button onclick="saveModel()" class="btn btn-save">💾 Сохранить модель</button>
+            <button onclick="loadModel()" class="btn btn-load">📂 Загрузить модель</button>
+            <button onclick="resetModel()" class="btn btn-reset">🔄 Сбросить обучение</button>
+        </div>
+        
+        <div class="game-wrapper">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+        
+        <div class="stats-panel">
+            <div class="stat-card">
+                <span class="stat-label">🧠 Состояний в памяти</span>
+                <span class="stat-value" id="stats">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">📉 Epsilon (исследование)</span>
+                <span class="stat-value" id="epsilon">0.700</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">🏆 Последняя награда</span>
+                <span class="stat-value" id="lastReward">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">🎯 Действие ИИ</span>
+                <span class="stat-value" id="aiAction">stop</span>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>📈 Обучение ИИ</h3>
+            <canvas id="trainingChart" width="600" height="250"></canvas>
+        </div>
+        
+        <div class="qtable-container">
+            <h3>📊 Q-таблица (ценность действий)</h3>
+            <div id="qtable" class="qtable-content">
+                Загрузка...
+            </div>
+        </div>
     </div>
     
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
     
     <script>
-        let lastRewardDisplay = 0;
+        let chart;
         
         setInterval(async () => {
             try {
                 const response = await fetch('/stats');
                 const data = await response.json();
-                document.getElementById('stats').innerHTML = 
-                    `Состояний в памяти: ${data.q_table_size} | ε=${data.epsilon.toFixed(3)}`;
+                document.getElementById('stats').innerHTML = data.q_table_size;
+                document.getElementById('epsilon').innerHTML = data.epsilon.toFixed(3);
             } catch(e) {}
         }, 2000);
         
@@ -49,40 +73,38 @@
                 const response = await fetch('/qtable');
                 const data = await response.json();
                 if (data.q_table && Object.keys(data.q_table).length > 0) {
-                    let html = '<strong>Q-таблица (ценность действий):</strong><br><table border="1" cellpadding="5" style="border-collapse: collapse;">';
-                    html += '<tr><th>Состояние</th><th>↑ up</th><th>↓ down</th><th>⏹ stop</th><th>Лучшее</th></tr>';
+                    let html = '<table class="qtable">';
+                    html += '<thead><tr><th>Состояние</th><th>⬆️ up</th><th>⬇️ down</th><th>⏹ stop</th><th>🏆 Лучшее</th></tr></thead><tbody>';
                     for (const [state, values] of Object.entries(data.q_table)) {
                         const bestIdx = values.indexOf(Math.max(...values));
                         const bestAction = ['up', 'down', 'stop'][bestIdx];
+                        const bestIcon = bestAction === 'up' ? '⬆️' : (bestAction === 'down' ? '⬇️' : '⏹');
                         html += `<tr>
-                            <td>${state}</td>
-                            <td>${values[0].toFixed(2)}</td>
-                            <td>${values[1].toFixed(2)}</td>
-                            <td>${values[2].toFixed(2)}</td>
-                            <td style="background:#0f0;">${bestAction}</td>
+                            <td class="state-cell">${state}</td>
+                            <td class="${bestIdx === 0 ? 'best-value' : ''}">${values[0].toFixed(1)}</td>
+                            <td class="${bestIdx === 1 ? 'best-value' : ''}">${values[1].toFixed(1)}</td>
+                            <td class="${bestIdx === 2 ? 'best-value' : ''}">${values[2].toFixed(1)}</td>
+                            <td class="best-action">${bestIcon} ${bestAction}</td>
                         </tr>`;
                     }
-                    html += '</table>';
+                    html += '</tbody></table>';
                     document.getElementById('qtable').innerHTML = html;
+                } else {
+                    document.getElementById('qtable').innerHTML = '<p class="empty-message">⏳ Начните игру, чтобы заполнить Q-таблицу...</p>';
                 }
             } catch(e) {}
         }, 3000);
-    </script>
-    <div style="margin-top: 20px;">
-        <canvas id="trainingChart" width="400" height="200" style="background: #333; border-radius: 10px;"></canvas>
-    </div>
-    <script>
-        let chart;
         
         async function updateChart() {
             try {
                 const response = await fetch('/history');
                 const data = await response.json();
                 
-                if (data.timestamps && data.timestamps.length > 0) {
+                if (data.timestamps && data.timestamps.length > 1) {
                     const labels = data.timestamps.map((_, i) => i);
                     
                     if (chart) {
+                        chart.data.labels = labels;
                         chart.data.datasets[0].data = data.epsilon_values;
                         chart.data.datasets[1].data = data.qtable_sizes;
                         chart.update();
@@ -96,28 +118,40 @@
                                     {
                                         label: 'Epsilon (исследование)',
                                         data: data.epsilon_values,
-                                        borderColor: '#ff4444',
-                                        backgroundColor: 'rgba(255,68,68,0.1)',
-                                        tension: 0.1,
+                                        borderColor: '#ff6b6b',
+                                        backgroundColor: 'rgba(255,107,107,0.05)',
+                                        borderWidth: 2,
+                                        pointRadius: 2,
+                                        pointBackgroundColor: '#ff6b6b',
+                                        tension: 0.2,
+                                        fill: true,
                                         yAxisID: 'y'
                                     },
                                     {
                                         label: 'Размер Q-таблицы',
                                         data: data.qtable_sizes,
-                                        borderColor: '#44ff44',
-                                        backgroundColor: 'rgba(68,255,68,0.1)',
-                                        tension: 0.1,
+                                        borderColor: '#51cf66',
+                                        backgroundColor: 'rgba(81,207,102,0.05)',
+                                        borderWidth: 2,
+                                        pointRadius: 2,
+                                        pointBackgroundColor: '#51cf66',
+                                        tension: 0.2,
+                                        fill: true,
                                         yAxisID: 'y1'
                                     }
                                 ]
                             },
                             options: {
                                 responsive: true,
-                                interaction: { mode: 'index', intersect: false },
-                                plugins: { legend: { position: 'top' } },
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: { position: 'top', labels: { color: '#fff', font: { size: 12 } } },
+                                    tooltip: { mode: 'index', intersect: false, backgroundColor: '#222', titleColor: '#fff', bodyColor: '#ccc' }
+                                },
                                 scales: {
-                                    y: { title: { display: true, text: 'Epsilon' }, min: 0, max: 1 },
-                                    y1: { position: 'right', title: { display: true, text: 'Размер Q-таблицы' } }
+                                    x: { grid: { color: '#333' }, ticks: { color: '#888' } },
+                                    y: { title: { display: true, text: 'Epsilon', color: '#ff6b6b' }, min: 0, max: 1, grid: { color: '#333' }, ticks: { color: '#888' } },
+                                    y1: { position: 'right', title: { display: true, text: 'Размер Q-таблицы', color: '#51cf66' }, grid: { drawOnChartArea: false }, ticks: { color: '#888' } }
                                 }
                             }
                         });
@@ -126,8 +160,8 @@
             } catch(e) { console.error(e); }
         }
         
-        setInterval(updateChart, 5000);
-        setTimeout(updateChart, 1000);
+        setInterval(updateChart, 4000);
+        setTimeout(updateChart, 1500);
     </script>
 </body>
 </html>
