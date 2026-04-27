@@ -80,19 +80,26 @@ def calculate_reward(action, hit_paddle, goal_scored, is_my_goal, right_paddle_y
     reward = 0
 
     if hit_paddle:
-        reward += 15
+        reward += 20
+        print(f"Отскок! +20")
 
     if is_my_goal:
-        reward -= 20
+        reward -= 25
+        print(f"Гол пропущен! -25")
 
     if goal_scored:
-        reward += 10
+        reward += 15
+        print(f"Гол забит! +15")
 
     paddle_center = right_paddle_y + paddle_height / 2
     distance = abs(paddle_center - ball_y)
-
-    if action == 'stop' and distance < 30:
-        reward += 3
+    
+    if action == 'stop' and distance < 25:
+        reward += 5
+        print(f"Хорошая позиция! +5")
+    elif action == 'stop' and distance > 70:
+        reward -= 3
+        print(f"Плохая позиция -3")
 
     return reward
 
