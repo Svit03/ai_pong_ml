@@ -132,32 +132,53 @@ async function startAutoTraining(games) {
     gameStarted = true;
     gameRunning = true;
     
-    document.getElementById('autoStatus').style.display = 'block';
+    const statusDiv = document.getElementById('autoStatus');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = `🔄 Авто-обучение: 0/${games} | Запуск...`;
     
     for (let i = 0; i < games; i++) {
         if (!autoTrainingActive) break;
         
         leftScore = 0;
         rightScore = 0;
-        resetBall('left');
+        ballX = canvas.width / 2;
+        ballY = canvas.height / 2;
+        ballSpeedX = (Math.random() > 0.5 ? 5 : -5);
+        ballSpeedY = (Math.random() > 0.5 ? 4 : -4);
+        leftPaddleY = (canvas.height - paddleHeight) / 2;
+        rightPaddleY = (canvas.height - paddleHeight) / 2;
+        paddleVelocity = 0;
         
         let gameActive = true;
-        let maxFrames = 3000;
+        let maxFrames = 4000;
         let frames = 0;
         
         while (gameActive && frames < maxFrames && autoTrainingActive) {
-            await updateAI();
-            await updateLeftAI();
+            let centerRight = rightPaddleY + paddleHeight / 2;
+            let diffRight = predictedY - centerRight;
+            if (Math.abs(diffRight) > 25) {
+                rightPaddleY += Math.sign(diffRight) * paddleSpeed * 0.8;
+            }
+            rightPaddleY = Math.max(0, Math.min(rightPaddleY, canvas.height - paddleHeight));
             
-            let newX = ballX + ballSpeedX;
-            let newY = ballY + ballSpeedY;
+            if (autoMode) {
+                let centerLeft = leftPaddleY + paddleHeight / 2;
+                let diffLeft = predictedY - centerLeft;
+                if (Math.abs(diffLeft) > 25) {
+                    leftPaddleY += Math.sign(diffLeft) * paddleSpeed * 0.8;
+                }
+                leftPaddleY = Math.max(0, Math.min(leftPaddleY, canvas.height - paddleHeight));
+            }
             
-            if (newY + ballRadius > canvas.height) {
-                newY = canvas.height - ballRadius;
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+            
+            if (ballY + ballRadius > canvas.height) {
+                ballY = canvas.height - ballRadius;
                 ballSpeedY = -ballSpeedY;
             }
-            if (newY - ballRadius < 0) {
-                newY = ballRadius;
+            if (ballY - ballRadius < 0) {
+                ballY = ballRadius;
                 ballSpeedY = -ballSpeedY;
             }
             
@@ -165,11 +186,11 @@ async function startAutoTraining(games) {
             const rightPaddleX = canvas.width - 30;
             
             if (ballSpeedX < 0 && 
-                newX - ballRadius < leftPaddleX + paddleWidth && 
-                newX + ballRadius > leftPaddleX &&
-                newY + ballRadius > leftPaddleY && 
-                newY - ballRadius < leftPaddleY + paddleHeight) {
-                newX = leftPaddleX + paddleWidth + ballRadius;
+                ballX - ballRadius < leftPaddleX + paddleWidth && 
+                ballX + ballRadius > leftPaddleX &&
+                ballY + ballRadius > leftPaddleY && 
+                ballY - ballRadius < leftPaddleY + paddleHeight) {
+                ballX = leftPaddleX + paddleWidth + ballRadius;
                 ballSpeedX = -ballSpeedX;
                 ballSpeedY += (Math.random() - 0.5) * 2;
                 ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
@@ -177,19 +198,16 @@ async function startAutoTraining(games) {
             }
             
             if (ballSpeedX > 0 && 
-                newX + ballRadius > rightPaddleX && 
-                newX - ballRadius < rightPaddleX + paddleWidth &&
-                newY + ballRadius > rightPaddleY && 
-                newY - ballRadius < rightPaddleY + paddleHeight) {
-                newX = rightPaddleX - ballRadius;
+                ballX + ballRadius > rightPaddleX && 
+                ballX - ballRadius < rightPaddleX + paddleWidth &&
+                ballY + ballRadius > rightPaddleY && 
+                ballY - ballRadius < rightPaddleY + paddleHeight) {
+                ballX = rightPaddleX - ballRadius;
                 ballSpeedX = -ballSpeedX;
                 ballSpeedY += (Math.random() - 0.5) * 2;
                 ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
                 await sendReward(true, false, false);
             }
-            
-            ballX = newX;
-            ballY = newY;
             
             if (ballX + ballRadius < 0) {
                 rightScore++;
@@ -207,18 +225,28 @@ async function startAutoTraining(games) {
         }
         
         autoTrainingComplete++;
-        const statusSpan = document.getElementById('autoStatus');
-        if (statusSpan) {
-            statusSpan.innerHTML = `🔄 Авто-обучение: ${autoTrainingComplete}/${autoTrainingGames} | Счёт: ${leftScore}:${rightScore}`;
-        }
+        statusDiv.innerHTML = `🔄 Авто-обучение: ${autoTrainingComplete}/${autoTrainingGames} | Счёт: ${leftScore}:${rightScore}`;
         
         await new Promise(r => setTimeout(r, 10));
     }
     
     autoTrainingActive = false;
     autoMode = false;
-    document.getElementById('autoStatus').style.display = 'none';
+    gameStarted = false;
+    gameRunning = true;
+    statusDiv.style.display = 'none';
     alert(`Авто-обучение завершено! Проведено партий: ${autoTrainingComplete}`);
+}
+
+function stopAutoTraining() {
+    if (autoTrainingActive) {
+        autoTrainingActive = false;
+        autoMode = false;
+        gameStarted = false;
+        gameRunning = true;
+        document.getElementById('autoStatus').style.display = 'none';
+        console.log('Авто-обучение остановлено');
+    }
 }
 
 function draw() {
@@ -400,9 +428,12 @@ function resetBall(side) {
 }
 
 function startGame() {
-    if (gameStarted) return;
+    if (autoTrainingActive) {
+        stopAutoTraining();
+    }
     gameStarted = true;
     gameRunning = true;
+    autoMode = false;
     countdownValue = 3;
     
     if (countdownInterval) clearInterval(countdownInterval);
