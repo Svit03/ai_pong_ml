@@ -24,7 +24,13 @@
             <button onclick="startAutoTraining(1000)" class="btn btn-auto">🔥 Авто-обучение 1000</button>
             <button onclick="stopAutoTraining()" class="btn btn-stop">⏹ Остановить</button>
         </div>
-        
+        <div class="difficulty-group">
+            <span style="color:#888; margin-right: 10px;">🎮 Сложность:</span>
+            <button onclick="setDifficulty('EASY')" class="btn-diff easy">🟢 Лёгкий</button>
+            <button onclick="setDifficulty('MEDIUM')" class="btn-diff medium">🟡 Средний</button>
+            <button onclick="setDifficulty('HARD')" class="btn-diff hard">🔴 Сложный</button>
+            <span id="difficultyDisplay" style="color:#00ff88; margin-left: 15px;">🟡 Средний</span>
+        </div>
         <div class="game-wrapper">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
