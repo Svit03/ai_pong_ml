@@ -19,10 +19,17 @@
             <button onclick="saveModel()" class="btn btn-save">💾 Сохранить модель</button>
             <button onclick="loadModel()" class="btn btn-load">📂 Загрузить модель</button>
             <button onclick="resetModel()" class="btn btn-reset">🧠 Сброс обучения</button>
+            <button onclick="startAutoTraining(100)" class="btn btn-auto">🤖 Авто-обучение 100</button>
+            <button onclick="startAutoTraining(500)" class="btn btn-auto">🚀 Авто-обучение 500</button>
+            <button onclick="stopAutoTraining()" class="btn btn-stop">⏹ Остановить</button>
         </div>
         
         <div class="game-wrapper">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+        
+        <div id="autoStatus" style="display: none; background: #2a2a3e; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: center; color: #00ff88; font-family: monospace;">
+            🔄 Авто-обучение...
         </div>
         
         <div class="stats-panel">
