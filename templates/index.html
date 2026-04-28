@@ -1,78 +1,100 @@
-<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pong ML - Самообучающийся ИИ</title>
+    <title>AI Pong | Neural Learning</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h1>🤖 AI Pong ML</h1>
-        <p class="subtitle">Самообучающийся ИИ | Управляй левой ракеткой мышкой</p>
-        
-        <div class="button-group">
-            <button onclick="startGame()" class="btn btn-start">▶️ Старт</button>
-            <button onclick="pauseGame()" class="btn btn-pause">⏸️ Пауза</button>
-            <button onclick="resetFullGame()" class="btn btn-reset-game">🔄 Сброс игры</button>
-            <button onclick="saveModel()" class="btn btn-save">💾 Сохранить модель</button>
-            <button onclick="loadModel()" class="btn btn-load">📂 Загрузить модель</button>
-            <button onclick="resetModel()" class="btn btn-reset">🧠 Сброс обучения</button>
-            <button onclick="startAutoTraining(100)" class="btn btn-auto">🤖 Авто-обучение 100</button>
-            <button onclick="startAutoTraining(500)" class="btn btn-auto">🚀 Авто-обучение 500</button>
-            <button onclick="startAutoTraining(1000)" class="btn btn-auto">🔥 Авто-обучение 1000</button>
-            <button onclick="stopAutoTraining()" class="btn btn-stop">⏹ Остановить</button>
+        <div class="hero">
+            <div class="hero-badge">AI RESEARCH LAB</div>
+            <h1>AI Pong</h1>
+            <p class="hero-sub">Самообучающийся интеллект · Играй против нейросети</p>
         </div>
-        <div class="difficulty-group">
-            <span style="color:#888; margin-right: 10px;">🎮 Сложность:</span>
-            <button onclick="setDifficulty('EASY')" class="btn-diff easy">🟢 Лёгкий</button>
-            <button onclick="setDifficulty('MEDIUM')" class="btn-diff medium">🟡 Средний</button>
-            <button onclick="setDifficulty('HARD')" class="btn-diff hard">🔴 Сложный</button>
-            <span id="difficultyDisplay" style="color:#00ff88; margin-left: 15px;">🟡 Средний</span>
+
+        <div class="controls-primary">
+            <button onclick="startGame()" class="primary-btn primary-btn-start">▶ Старт</button>
+            <button onclick="pauseGame()" class="primary-btn primary-btn-pause">⏸ Пауза</button>
+            <button onclick="resetFullGame()" class="primary-btn primary-btn-reset">⟳ Сброс игры</button>
         </div>
-        <div class="game-wrapper">
+
+        <div class="game-stage">
+            <div class="game-border"></div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
-        
-        <div id="autoStatus" style="display: none; background: #2a2a3e; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: center; color: #00ff88; font-family: monospace;">
-            🔄 Авто-обучение...
+
+        <div id="autoStatus" class="toast-status" style="display: none;">
+            <span>🤖 АВТО-ОБУЧЕНИЕ АКТИВНО</span>
         </div>
-        
-        <div class="stats-panel">
-            <div class="stat-card">
-                <span class="stat-label">🧠 Состояний в памяти</span>
-                <span class="stat-value" id="stats">0</span>
+
+        <div class="config-grid">
+            <div class="config-card">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">Сложность</div>
+                <div class="button-stack">
+                    <button onclick="setDifficulty('EASY')" class="ghost-btn ghost-easy">Лёгкая</button>
+                    <button onclick="setDifficulty('MEDIUM')" class="ghost-btn ghost-medium">Средняя</button>
+                    <button onclick="setDifficulty('HARD')" class="ghost-btn ghost-hard">Сложная</button>
+                </div>
+                <div class="status-chip" id="difficultyDisplay">Средняя</div>
             </div>
-            <div class="stat-card">
-                <span class="stat-label">📉 Epsilon (исследование)</span>
-                <span class="stat-value" id="epsilon">0.700</span>
+
+            <div class="config-card">
+                <div class="card-icon">🧠</div>
+                <div class="card-title">Модель AI</div>
+                <div class="button-stack">
+                    <button onclick="saveModel()" class="ghost-btn ghost-save">💾 Сохранить</button>
+                    <button onclick="loadModel()" class="ghost-btn ghost-load">📂 Загрузить</button>
+                    <button onclick="resetModel()" class="ghost-btn ghost-reset">🗑 Сбросить</button>
+                </div>
             </div>
-            <div class="stat-card">
-                <span class="stat-label">🏆 Последняя награда</span>
-                <span class="stat-value" id="lastReward">0</span>
+
+            <div class="config-card">
+                <div class="card-icon">⚡</div>
+                <div class="card-title">Авто-обучение</div>
+                <div class="auto-group">
+                    <button onclick="startAutoTraining(100)" class="ghost-btn ghost-auto">100 игр</button>
+                    <button onclick="startAutoTraining(500)" class="ghost-btn ghost-auto">500 игр</button>
+                    <button onclick="startAutoTraining(1000)" class="ghost-btn ghost-auto">1000 игр</button>
+                </div>
+                <button onclick="stopAutoTraining()" class="ghost-btn ghost-stop">⏹ Остановить</button>
             </div>
-            <div class="stat-card">
-                <span class="stat-label">🎯 Действие ИИ</span>
-                <span class="stat-value" id="aiAction">stop</span>
+
+            <div class="config-card">
+                <div class="card-icon">📊</div>
+                <div class="card-title">Телеметрия</div>
+                <div class="metric-list">
+                    <div class="metric"><span>Состояний</span><span id="stats" class="metric-value">0</span></div>
+                    <div class="metric"><span>Epsilon</span><span id="epsilon" class="metric-value">0.700</span></div>
+                    <div class="metric"><span>Награда</span><span id="lastReward" class="metric-value">0</span></div>
+                    <div class="metric"><span>Действие</span><span id="aiAction" class="metric-value">stop</span></div>
+                </div>
             </div>
         </div>
-        
-        <div class="chart-container">
-            <h3>📈 Обучение ИИ</h3>
-            <canvas id="trainingChart" width="600" height="250"></canvas>
+
+        <div class="insight-panel">
+            <div class="insight-header">
+                <span class="insight-title">📈 Кривая обучения</span>
+                <span class="insight-badge">epsilon / q‑table</span>
+            </div>
+            <canvas id="trainingChart" width="600" height="220"></canvas>
         </div>
-        
-        <div class="qtable-container">
-            <h3>📊 Q-таблица (ценность действий)</h3>
-            <div id="qtable" class="qtable-content">
-                Загрузка...
+
+        <div class="insight-panel">
+            <div class="insight-header">
+                <span class="insight-title">📊 Q‑таблица</span>
+                <span class="insight-badge">ценность действий</span>
+            </div>
+            <div id="qtable" class="qtable-wrap">
+                <div class="loading-placeholder">Загрузка данных...</div>
             </div>
         </div>
     </div>
-    
+
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
-    
     <script>
         let chart;
         
@@ -90,24 +112,27 @@
                 const response = await fetch('/qtable');
                 const data = await response.json();
                 if (data.q_table && Object.keys(data.q_table).length > 0) {
-                    let html = '<table class="qtable">';
-                    html += '<thead><tr><th>Состояние</th><th>⬆️ up</th><th>⬇️ down</th><th>⏹ stop</th><th>🏆 Лучшее</th></tr></thead><tbody>';
+                    let html = '<table class="qtable-modern">';
+                    html += '<thead><tr><th>Состояние</th><th>⬆ up</th><th>⬇ down</th><th>⏹ stop</th><th>Лучшее</th></td></thead><tbody>';
                     for (const [state, values] of Object.entries(data.q_table)) {
                         const bestIdx = values.indexOf(Math.max(...values));
                         const bestAction = ['up', 'down', 'stop'][bestIdx];
-                        const bestIcon = bestAction === 'up' ? '⬆️' : (bestAction === 'down' ? '⬇️' : '⏹');
+                        let bestColor = '';
+                        if (bestAction === 'up') bestColor = '#0a84ff';
+                        else if (bestAction === 'down') bestColor = '#ff9f0a';
+                        else bestColor = '#30d158';
                         html += `<tr>
-                            <td class="state-cell">${state}</td>
-                            <td class="${bestIdx === 0 ? 'best-value' : ''}">${values[0].toFixed(1)}</td>
-                            <td class="${bestIdx === 1 ? 'best-value' : ''}">${values[1].toFixed(1)}</td>
-                            <td class="${bestIdx === 2 ? 'best-value' : ''}">${values[2].toFixed(1)}</td>
-                            <td class="best-action">${bestIcon} ${bestAction}</td>
+                            <td class="state-highlight">${state}</td>
+                            <td class="${bestIdx === 0 ? 'highlight-value-up' : ''}">${values[0].toFixed(1)}</td>
+                            <td class="${bestIdx === 1 ? 'highlight-value-down' : ''}">${values[1].toFixed(1)}</td>
+                            <td class="${bestIdx === 2 ? 'highlight-value-stop' : ''}">${values[2].toFixed(1)}</td>
+                            <td class="best-badge" style="background: ${bestColor}15; color: ${bestColor};">${bestAction}</td>
                         </tr>`;
                     }
                     html += '</tbody></table>';
                     document.getElementById('qtable').innerHTML = html;
                 } else {
-                    document.getElementById('qtable').innerHTML = '<p class="empty-message">⏳ Начните игру, чтобы заполнить Q-таблицу...</p>';
+                    document.getElementById('qtable').innerHTML = '<div class="loading-placeholder">Начните игру, чтобы заполнить Q‑таблицу</div>';
                 }
             } catch(e) {}
         }, 3000);
@@ -116,10 +141,8 @@
             try {
                 const response = await fetch('/history');
                 const data = await response.json();
-                
                 if (data.timestamps && data.timestamps.length > 1) {
                     const labels = data.timestamps.map((_, i) => i);
-                    
                     if (chart) {
                         chart.data.labels = labels;
                         chart.data.datasets[0].data = data.epsilon_values;
@@ -133,28 +156,28 @@
                                 labels: labels,
                                 datasets: [
                                     {
-                                        label: 'Epsilon (исследование)',
+                                        label: 'Epsilon',
                                         data: data.epsilon_values,
-                                        borderColor: '#ff6b6b',
-                                        backgroundColor: 'rgba(255,107,107,0.05)',
-                                        borderWidth: 2,
-                                        pointRadius: 2,
-                                        pointBackgroundColor: '#ff6b6b',
+                                        borderColor: '#ff9f0a',
+                                        backgroundColor: 'rgba(255,159,10,0.08)',
+                                        borderWidth: 2.5,
+                                        pointRadius: 3,
+                                        pointBackgroundColor: '#ff9f0a',
+                                        pointBorderColor: '#ff9f0a',
                                         tension: 0.2,
-                                        fill: true,
-                                        yAxisID: 'y'
+                                        fill: true
                                     },
                                     {
-                                        label: 'Размер Q-таблицы',
+                                        label: 'Q‑таблица',
                                         data: data.qtable_sizes,
-                                        borderColor: '#51cf66',
-                                        backgroundColor: 'rgba(81,207,102,0.05)',
-                                        borderWidth: 2,
-                                        pointRadius: 2,
-                                        pointBackgroundColor: '#51cf66',
+                                        borderColor: '#30d158',
+                                        backgroundColor: 'rgba(48,209,88,0.08)',
+                                        borderWidth: 2.5,
+                                        pointRadius: 3,
+                                        pointBackgroundColor: '#30d158',
+                                        pointBorderColor: '#30d158',
                                         tension: 0.2,
-                                        fill: true,
-                                        yAxisID: 'y1'
+                                        fill: true
                                     }
                                 ]
                             },
@@ -162,13 +185,12 @@
                                 responsive: true,
                                 maintainAspectRatio: true,
                                 plugins: {
-                                    legend: { position: 'top', labels: { color: '#fff', font: { size: 12 } } },
-                                    tooltip: { mode: 'index', intersect: false, backgroundColor: '#222', titleColor: '#fff', bodyColor: '#ccc' }
+                                    legend: { position: 'top', labels: { color: '#e5e5ea', font: { size: 11, family: 'Inter', weight: '500' } } },
+                                    tooltip: { mode: 'index', intersect: false, backgroundColor: '#2c2c2e', titleColor: '#fff', bodyColor: '#aaa' }
                                 },
                                 scales: {
-                                    x: { grid: { color: '#333' }, ticks: { color: '#888' } },
-                                    y: { title: { display: true, text: 'Epsilon', color: '#ff6b6b' }, min: 0, max: 1, grid: { color: '#333' }, ticks: { color: '#888' } },
-                                    y1: { position: 'right', title: { display: true, text: 'Размер Q-таблицы', color: '#51cf66' }, grid: { drawOnChartArea: false }, ticks: { color: '#888' } }
+                                    x: { grid: { color: '#3a3a3c' }, ticks: { color: '#8e8e93' } },
+                                    y: { grid: { color: '#3a3a3c' }, ticks: { color: '#8e8e93' } }
                                 }
                             }
                         });
@@ -181,4 +203,4 @@
         setTimeout(updateChart, 1500);
     </script>
 </body>
-</html>
+</html> 
