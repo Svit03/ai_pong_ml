@@ -3,7 +3,47 @@ const ctx = canvas.getContext('2d');
 
 const paddleWidth = 10;
 const paddleHeight = 100;
-const paddleSpeed = 6;
+let paddleSpeed = DIFFICULTY_SETTINGS.MEDIUM.paddleSpeed;
+
+let currentDifficulty = 'MEDIUM';
+const DIFFICULTY_SETTINGS = {
+    EASY: {
+        paddleSpeed: 4,
+        aiSpeed: 4,
+        reactionDelay: 40,
+        maxBallSpeed: 14,
+        startBallSpeed: 4,
+        name: '🟢 Лёгкий'
+    },
+    MEDIUM: {
+        paddleSpeed: 6,
+        aiSpeed: 8,
+        reactionDelay: 25,
+        maxBallSpeed: 18,
+        startBallSpeed: 5,
+        name: '🟡 Средний'
+    },
+    HARD: {
+        paddleSpeed: 8,
+        aiSpeed: 12,
+        reactionDelay: 15,
+        maxBallSpeed: 22,
+        startBallSpeed: 6,
+        name: '🔴 Сложный'
+    }
+};
+
+function setDifficulty(level) {
+    currentDifficulty = level;
+    const settings = DIFFICULTY_SETTINGS[level];
+    
+    document.getElementById('difficultyDisplay').innerHTML = settings.name;
+    paddleSpeed = settings.paddleSpeed;
+    
+    ACTION_DELAY = settings.reactionDelay;
+    
+    console.log(`Сложность изменена на ${level}`);
+}
 
 let ballX = canvas.width / 2;
 let ballY = canvas.height / 2;
@@ -23,7 +63,7 @@ let predictedY = ballY;
 
 let currentAction = 'stop';
 let actionCooldown = 0;
-const ACTION_DELAY = 25;
+let ACTION_DELAY = DIFFICULTY_SETTINGS.MEDIUM.reactionDelay;
 
 let gameRunning = true;
 let gameStarted = false;
@@ -34,6 +74,21 @@ let autoMode = false;
 let autoTrainingActive = false;
 let autoTrainingGames = 0;
 let autoTrainingComplete = 0;
+
+let lastRightPaddleY = rightPaddleY;
+let lastLeftPaddleY = leftPaddleY;
+
+function applyPaddleBounce(paddleY, isRightPaddle) {
+    const paddleCenter = paddleY + paddleHeight / 2;
+    const hitPos = (ballY - paddleCenter) / (paddleHeight / 2);
+    const clamped = Math.max(-1, Math.min(1, hitPos));
+    const MAX_ANGLE = Math.PI / 3;
+    const angle = clamped * MAX_ANGLE;
+    const speed = Math.sqrt(ballSpeedX * ballSpeedX + ballSpeedY * ballSpeedY);
+    const direction = isRightPaddle ? -1 : 1;
+    ballSpeedX = Math.cos(angle) * speed * direction;
+    ballSpeedY = Math.sin(angle) * speed;
+}
 
 canvas.addEventListener('mousemove', (e) => {
     if (!gameRunning || !gameStarted) return;
@@ -68,6 +123,8 @@ async function getAiAction() {
 async function updateAI() {
     if (!gameRunning || !gameStarted) return;
     
+    const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+    
     if (actionCooldown > 0) {
         actionCooldown--;
     } else {
@@ -78,11 +135,13 @@ async function updateAI() {
 
     let center = rightPaddleY + paddleHeight / 2;
     let diff = predictedY - center;
-
-    const DEADZONE = 35;
-    const MAX_SPEED = 8;
-    const ACCELERATION = 0.5;
-    const FRICTION = 0.8;
+    
+    let speed = Math.sqrt(ballSpeedX * ballSpeedX + ballSpeedY * ballSpeedY);
+    const DIFFICULTY = Math.min(1.5, speed / 8);
+    const DEADZONE = (35 / DIFFICULTY) * (currentDifficulty === 'EASY' ? 1.5 : currentDifficulty === 'HARD' ? 0.7 : 1);
+    const MAX_SPEED = settings.aiSpeed + speed * 0.2;
+    const ACCELERATION = (0.3 + speed * 0.02) * (currentDifficulty === 'EASY' ? 0.7 : currentDifficulty === 'HARD' ? 1.3 : 1);
+    const FRICTION = 0.85;
 
     let targetVelocity = 0;
 
@@ -314,6 +373,8 @@ let hitPaddleThisFrame = false;
 function updateGame() {
     if (!gameRunning || !gameStarted || countdownValue > 0) return;
     
+    const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+    
     let newX = ballX + ballSpeedX;
     let newY = ballY + ballSpeedY;
     
@@ -337,8 +398,13 @@ function updateGame() {
         
         newX = leftPaddleX + paddleWidth + ballRadius;
         ballSpeedX = -ballSpeedX;
+        
+        const SPEED_INCREASE = 1.08;
+        ballSpeedX *= SPEED_INCREASE;
+        ballSpeedY *= SPEED_INCREASE;
+        
         ballSpeedY += (Math.random() - 0.5) * 2;
-        ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
+        ballSpeedY = Math.max(-settings.maxBallSpeed, Math.min(settings.maxBallSpeed, ballSpeedY));
     }
     
     if (ballSpeedX > 0 && 
@@ -350,8 +416,13 @@ function updateGame() {
         newX = rightPaddleX - ballRadius;
         ballSpeedX = -ballSpeedX;
         hitPaddleThisFrame = true;
+        
+        const SPEED_INCREASE = 1.08;
+        ballSpeedX *= SPEED_INCREASE;
+        ballSpeedY *= SPEED_INCREASE;
+        
         ballSpeedY += (Math.random() - 0.5) * 2;
-        ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
+        ballSpeedY = Math.max(-settings.maxBallSpeed, Math.min(settings.maxBallSpeed, ballSpeedY));
     }
     
     ballX = newX;
@@ -370,6 +441,14 @@ function updateGame() {
     } else if (hitPaddleThisFrame) {
         sendReward(true, false, false);
         hitPaddleThisFrame = false;
+    }
+    
+    let speed = Math.sqrt(ballSpeedX * ballSpeedX + ballSpeedY * ballSpeedY);
+    
+    if (speed > settings.maxBallSpeed) {
+        let scale = settings.maxBallSpeed / speed;
+        ballSpeedX *= scale;
+        ballSpeedY *= scale;
     }
 }
 
@@ -414,17 +493,20 @@ function resetBall(side) {
     ballX = canvas.width / 2;
     ballY = canvas.height / 2;
     
+    const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+    const startSpeed = settings.startBallSpeed;
+    
     if (side === 'left') {
-        ballSpeedX = -5;
+        ballSpeedX = -startSpeed;
     } else {
-        ballSpeedX = 5;
+        ballSpeedX = startSpeed;
     }
     
     const randomAngle = (Math.random() - 0.5) * 2;
-    ballSpeedY = 3 * randomAngle;
+    ballSpeedY = startSpeed * 0.6 * randomAngle;
     
-    if (Math.abs(ballSpeedY) < 1.5) ballSpeedY = ballSpeedY > 0 ? 1.5 : -1.5;
-    if (Math.abs(ballSpeedY) > 5) ballSpeedY = ballSpeedY > 0 ? 5 : -5;
+    if (Math.abs(ballSpeedY) < startSpeed * 0.3) ballSpeedY = ballSpeedY > 0 ? startSpeed * 0.3 : -startSpeed * 0.3;
+    if (Math.abs(ballSpeedY) > startSpeed) ballSpeedY = ballSpeedY > 0 ? startSpeed : -startSpeed;
 }
 
 function startGame() {
