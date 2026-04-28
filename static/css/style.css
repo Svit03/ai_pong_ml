@@ -211,6 +211,28 @@ h1 {
     color: #666;
 }
 
+.btn-auto {
+    background: #9b59b6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(155,89,182,0.3);
+}
+
+.btn-auto:hover {
+    background: #af6bc8;
+    transform: translateY(-2px);
+}
+
+.btn-stop {
+    background: #e74c3c;
+    color: white;
+    box-shadow: 0 2px 8px rgba(231,76,60,0.3);
+}
+
+.btn-stop:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
