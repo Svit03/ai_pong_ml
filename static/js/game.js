@@ -30,6 +30,11 @@ let gameStarted = false;
 let countdownValue = 3;
 let countdownInterval = null;
 
+let autoMode = false;
+let autoTrainingActive = false;
+let autoTrainingGames = 0;
+let autoTrainingComplete = 0;
+
 canvas.addEventListener('mousemove', (e) => {
     if (!gameRunning || !gameStarted) return;
     const rect = canvas.getBoundingClientRect();
@@ -98,6 +103,122 @@ async function updateAI() {
         rightPaddleY = canvas.height - paddleHeight;
         paddleVelocity = 0;
     }
+}
+
+async function updateLeftAI() {
+    if (!autoMode) return;
+    
+    let center = leftPaddleY + paddleHeight / 2;
+    let diff = predictedY - center;
+    
+    let targetY = leftPaddleY;
+    if (Math.abs(diff) > 30) {
+        targetY = leftPaddleY + Math.sign(diff) * paddleSpeed * 0.6;
+    }
+    
+    if (targetY < 0) targetY = 0;
+    if (targetY > canvas.height - paddleHeight) targetY = canvas.height - paddleHeight;
+    
+    leftPaddleY = leftPaddleY + (targetY - leftPaddleY) * 0.3;
+}
+
+async function startAutoTraining(games) {
+    if (autoTrainingActive) return;
+    
+    autoTrainingActive = true;
+    autoTrainingGames = games;
+    autoTrainingComplete = 0;
+    autoMode = true;
+    gameStarted = true;
+    gameRunning = true;
+    
+    document.getElementById('autoStatus').style.display = 'block';
+    
+    for (let i = 0; i < games; i++) {
+        if (!autoTrainingActive) break;
+        
+        leftScore = 0;
+        rightScore = 0;
+        resetBall('left');
+        
+        let gameActive = true;
+        let maxFrames = 3000;
+        let frames = 0;
+        
+        while (gameActive && frames < maxFrames && autoTrainingActive) {
+            await updateAI();
+            await updateLeftAI();
+            
+            let newX = ballX + ballSpeedX;
+            let newY = ballY + ballSpeedY;
+            
+            if (newY + ballRadius > canvas.height) {
+                newY = canvas.height - ballRadius;
+                ballSpeedY = -ballSpeedY;
+            }
+            if (newY - ballRadius < 0) {
+                newY = ballRadius;
+                ballSpeedY = -ballSpeedY;
+            }
+            
+            const leftPaddleX = 20;
+            const rightPaddleX = canvas.width - 30;
+            
+            if (ballSpeedX < 0 && 
+                newX - ballRadius < leftPaddleX + paddleWidth && 
+                newX + ballRadius > leftPaddleX &&
+                newY + ballRadius > leftPaddleY && 
+                newY - ballRadius < leftPaddleY + paddleHeight) {
+                newX = leftPaddleX + paddleWidth + ballRadius;
+                ballSpeedX = -ballSpeedX;
+                ballSpeedY += (Math.random() - 0.5) * 2;
+                ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
+                await sendReward(true, false, false);
+            }
+            
+            if (ballSpeedX > 0 && 
+                newX + ballRadius > rightPaddleX && 
+                newX - ballRadius < rightPaddleX + paddleWidth &&
+                newY + ballRadius > rightPaddleY && 
+                newY - ballRadius < rightPaddleY + paddleHeight) {
+                newX = rightPaddleX - ballRadius;
+                ballSpeedX = -ballSpeedX;
+                ballSpeedY += (Math.random() - 0.5) * 2;
+                ballSpeedY = Math.max(-10, Math.min(10, ballSpeedY));
+                await sendReward(true, false, false);
+            }
+            
+            ballX = newX;
+            ballY = newY;
+            
+            if (ballX + ballRadius < 0) {
+                rightScore++;
+                await sendReward(false, true, true);
+                resetBall('left');
+                gameActive = false;
+            } else if (ballX - ballRadius > canvas.width) {
+                leftScore++;
+                await sendReward(true, false, false);
+                resetBall('right');
+                gameActive = false;
+            }
+            
+            frames++;
+        }
+        
+        autoTrainingComplete++;
+        const statusSpan = document.getElementById('autoStatus');
+        if (statusSpan) {
+            statusSpan.innerHTML = `🔄 Авто-обучение: ${autoTrainingComplete}/${autoTrainingGames} | Счёт: ${leftScore}:${rightScore}`;
+        }
+        
+        await new Promise(r => setTimeout(r, 10));
+    }
+    
+    autoTrainingActive = false;
+    autoMode = false;
+    document.getElementById('autoStatus').style.display = 'none';
+    alert(`Авто-обучение завершено! Проведено партий: ${autoTrainingComplete}`);
 }
 
 function draw() {
