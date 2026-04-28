@@ -233,6 +233,16 @@ h1 {
     transform: translateY(-2px);
 }
 
+.btn-auto[onclick*="1000"] {
+    background: #e74c3c;
+    box-shadow: 0 2px 8px rgba(231,76,60,0.5);
+}
+
+.btn-auto[onclick*="1000"]:hover {
+    background: #ff6b6b;
+    transform: translateY(-2px);
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

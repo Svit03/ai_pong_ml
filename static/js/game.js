@@ -479,6 +479,7 @@ function resetFullGame() {
 setInterval(async () => {
     if (gameStarted && gameRunning && countdownValue <= 0) {
         await fetch('/save_model', { method: 'POST' });
+        console.log('Model auto-saved');
     }
 }, 30000);
 
@@ -491,8 +492,52 @@ async function gameLoop() {
 
 gameLoop();
 
-window.saveModel = () => { if (gameStarted && gameRunning) fetch('/save_model', { method: 'POST'}); };
-window.loadModel = () => fetch('/load_model', { method: 'POST' });
-window.resetModel = () => { resetFullGame(); fetch('/reset_model', { method: 'POST'}); };
+window.saveModel = async () => {
+    try {
+        const response = await fetch('/save_model', { method: 'POST' });
+        const data = await response.json();
+        console.log('Модель сохранена:', data);
+        alert('💾 Модель сохранена!');
+    } catch(e) {
+        console.error('Ошибка сохранения:', e);
+        alert('Ошибка сохранения модели');
+    }
+};
+
+window.loadModel = async () => {
+    try {
+        const response = await fetch('/load_model', { method: 'POST' });
+        const data = await response.json();
+        console.log('Модель загружена:', data);
+        if (data.status === 'loaded') {
+            alert(`📂 Модель загружена! Состояний: ${data.size}, ε=${data.epsilon.toFixed(3)}`);
+            document.getElementById('stats').innerHTML = data.size;
+            document.getElementById('epsilon').innerHTML = data.epsilon.toFixed(3);
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Модель не найдена. Сначала сохраните модель (💾)');
+        }
+    } catch(e) {
+        console.error('Ошибка загрузки:', e);
+        alert('Ошибка загрузки модели: ' + e.message);
+    }
+};
+
+window.resetModel = async () => {
+    if (confirm('Сбросить обучение ИИ? Это удалит все накопленные знания!')) {
+        try {
+            await fetch('/reset_model', { method: 'POST' });
+            alert('🧠 Обучение сброшено! Страница обновится.');
+            location.reload();
+        } catch(e) {
+            console.error('Ошибка сброса:', e);
+            alert('Ошибка сброса');
+        }
+    }
+};
+
 window.startGame = startGame;
 window.pauseGame = pauseGame;
+window.resetFullGame = resetFullGame;
+window.startAutoTraining = startAutoTraining;
+window.stopAutoTraining = stopAutoTraining;

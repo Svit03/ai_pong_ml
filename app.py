@@ -23,10 +23,10 @@ IDX_TO_ACTION = {0: 'up', 1: 'down', 2: 'stop'}
 q_table = {}
 
 ALPHA = 0.15
-GAMMA = 0.95
-EPSILON = 0.8
-EPSILON_DECAY = 0.992
-EPSILON_MIN = 0.02
+GAMMA = 0.92
+EPSILON = 0.9
+EPSILON_DECAY = 0.999
+EPSILON_MIN = 0.08
 
 last_state = None
 last_action = None
@@ -214,14 +214,19 @@ def load_model():
         data = joblib.load('models/qlearning_model.pkl')
         q_table = data['q_table']
         EPSILON = data['epsilon']
-        return jsonify({'status': 'loaded'})
-    return jsonify({'status': 'no model'})
+        print(f"✅ Модель загружена! Состояний: {len(q_table)}, ε={EPSILON:.3f}")
+        return jsonify({
+            'status': 'loaded', 
+            'size': len(q_table),
+            'epsilon': EPSILON
+        })
+    return jsonify({'status': 'no model found'})
 
 @app.route('/reset_model', methods=['POST'])
 def reset_model():
     global q_table, EPSILON, training_history
     q_table = {}
-    EPSILON = 0.7
+    EPSILON = 0.9
     training_history = {
         'timestamps': [],
         'epsilon_values': [],
